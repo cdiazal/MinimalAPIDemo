@@ -1,61 +1,74 @@
-﻿namespace MinimalApiDemo.Services
-{
-    public class WeatherService
-    {
-        private List<string> _summaries = new() { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
+﻿using System.ComponentModel.DataAnnotations;
 
-        public WeatherForecast[] GetWeatherForecasts()
+namespace MinimalApiDemo.Services
+{
+    public interface IWeatherService
+    {
+        WeatherForecast[] GetAllWeatherForecasts();
+        WeatherForecast? GetWeatherForecasts(string id);
+        void Add(string id);
+        void Update(string id, int newTemperatureC);
+        void Delete(string id);
+    }
+
+    public class WeatherService : IWeatherService
+    {
+        private readonly ApiDbContext _db;
+
+        public WeatherService(ApiDbContext db)
         {
-            var forecast = Enumerable.Range(1, 5).Select(index =>
-                    new WeatherForecast
-                    (
-                        DateTime.Now.AddDays(index),
-                        Random.Shared.Next(-20, 55),
-                        _summaries[Random.Shared.Next(_summaries.Count)]
-                    ))
-                .ToArray();
-            return forecast;
+            _db = db;
         }
 
         public WeatherForecast[] GetAllWeatherForecasts()
         {
-            var forecast = Enumerable.Range(1, _summaries.Count).Select(index =>
-                    new WeatherForecast
-                    (
-                        DateTime.Now.AddDays(index),
-                        Random.Shared.Next(-20, 55),
-                        _summaries[Random.Shared.Next(_summaries.Count)]
-                    ))
-                .ToArray();
-            return forecast;
+            return _db.WeatherForecasts.ToArray();
         }
 
-        public string? GetWeatherForecasts(string id)
+        public WeatherForecast? GetWeatherForecasts(string id)
         {
-            return _summaries.FirstOrDefault(x => x == id);
+            return _db.WeatherForecasts.FirstOrDefault(x => x.Summary == id);
         }
 
-        public void Add(string id)
+        public async void Add(string id)
         {
-            _summaries.Add(id);
+            _db.WeatherForecasts.Add(new WeatherForecast(DateTime.UtcNow, 0, id));
+            await _db.SaveChangesAsync();
         }
 
-        public void Update(string id, string newId)
+        public async void Update(string id, int newTemperatureC)
         {
-            int index = _summaries.FindIndex(s => s == id);
+            var existingItem = _db.WeatherForecasts.FirstOrDefault(x => x.Summary == id);
 
-            if (index != -1)
-                _summaries[index] = newId;
+            if (existingItem != null)
+                existingItem.TemperatureC = newTemperatureC;
+            await _db.SaveChangesAsync();
+
         }
 
-        public void Delete(string id)
+        public async void Delete(string id)
         {
-            _summaries.RemoveAll(x => x == id);
+            var existingItem = _db.WeatherForecasts.FirstOrDefault(x => x.Summary == id);
+
+            if (existingItem != null)
+                _db.WeatherForecasts.Remove(existingItem);
+            await _db.SaveChangesAsync();
         }
     }
 
-    public record WeatherForecast(DateTime Date, int TemperatureC, string? Summary)
+    public class WeatherForecast
     {
+        [Key]
+        public string Summary { get; set; }
+        public DateTime Date { get; set; }
+        public int TemperatureC { get; set; }
         public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+
+        public WeatherForecast(DateTime date, int temperatureC, string? summary)
+        {
+            Date = date;
+            TemperatureC = temperatureC;
+            Summary = summary;
+        }
     }
 }

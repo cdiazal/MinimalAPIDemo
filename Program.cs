@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using MinimalApiDemo;
 using MinimalApiDemo.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,7 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSingleton(new WeatherService());
+builder.Services.AddScoped<IWeatherService, WeatherService>();
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApiDbContext>(options =>
+    options.UseSqlite(connectionString));
 
 var app = builder.Build();
 
@@ -19,37 +25,34 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/weatherforecast", (HttpContext _, WeatherService weatherService) => weatherService.GetWeatherForecasts())
-    .WithName("GetWeatherForecast");
-
-app.MapGet("/weatherforecast/{id}", (HttpContext _, WeatherService weatherService, string id) =>
+app.MapGet("/weatherforecast/{id}", (HttpContext _, IWeatherService weatherService, string id) =>
     {
         var result = weatherService.GetWeatherForecasts(id);
         return result != null ? Results.Ok(result) : Results.NotFound();
     })
     .WithName("GetWeatherForecastById");
 
-app.MapGet("/allweatherforecast", (HttpContext _, WeatherService weatherService) => weatherService.GetAllWeatherForecasts())
+app.MapGet("/allweatherforecast", (HttpContext _, IWeatherService weatherService) => weatherService.GetAllWeatherForecasts())
     .WithName("GetAllWeatherForecast");
 
-app.MapPost("/weatherforecast", (HttpContext _, WeatherService weatherService, string id) =>
+app.MapPost("/weatherforecast", (HttpContext _, IWeatherService weatherService, string id) =>
 {
     weatherService.Add(id);
     return Results.Created($"/weatherforecast/{id}", id);
 }).WithName("CreateWeatherForecast");
 
-app.MapPut("/weatherforecast/{id}", (HttpContext _, WeatherService weatherService, string id, string newId) =>
+app.MapPut("/weatherforecast/{id}", (HttpContext _, IWeatherService weatherService, string id, int newTemperature) =>
 {
     if (weatherService.GetWeatherForecasts(id) == null)
     {
         return Results.NotFound();
     }
 
-    weatherService.Update(id, newId);
-    return Results.Ok(newId);
+    weatherService.Update(id, newTemperature);
+    return Results.Ok(newTemperature);
 }).WithName("UpdateWeatherForecast");
 
-app.MapDelete("/weatherforecast/{id}", (HttpContext _, WeatherService weatherService, string id) =>
+app.MapDelete("/weatherforecast/{id}", (HttpContext _, IWeatherService weatherService, string id) =>
 {
     if (weatherService.GetWeatherForecasts(id) == null)
     {
